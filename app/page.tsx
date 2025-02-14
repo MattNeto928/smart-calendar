@@ -17,7 +17,7 @@ export default function LandingPage() {
           <div className="flex justify-between h-16 items-center">
             <div className="flex items-center gap-2">
               <Calendar className="h-6 w-6 text-blue-600" />
-              <span className="text-xl font-semibold">Student Calendar</span>
+              <span className="text-xl font-semibold">EasyCal</span>
             </div>
             <Button
               onClick={signIn}
@@ -117,10 +117,10 @@ export default function LandingPage() {
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
               <Calendar className="h-5 w-5 text-gray-400" />
-              <span className="text-gray-600">Student Calendar</span>
+              <span className="text-gray-600">EasyCal</span>
             </div>
             <p className="text-gray-500 text-sm">
-              © {new Date().getFullYear()} Student Calendar. All rights reserved.
+              © {new Date().getFullYear()} EasyCal. All rights reserved.
             </p>
           </div>
         </div>

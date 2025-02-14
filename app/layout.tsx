@@ -6,8 +6,8 @@ import { Providers } from "@/components/Providers";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Student Calendar",
-  description: "AI-powered academic calendar for students",
+  title: "EasyCal",
+  description: "Calendars made easy powered by AI",
 };
 
 export default function RootLayout({
