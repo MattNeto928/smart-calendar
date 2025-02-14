@@ -1,9 +1,13 @@
-export function GoogleIcon() {
+interface GoogleIconProps {
+  className?: string;
+}
+
+export function GoogleIcon({ className = "" }: GoogleIconProps) {
   return (
     <svg 
       xmlns="http://www.w3.org/2000/svg" 
       viewBox="0 0 48 48" 
-      className="w-5 h-5"
+      className={`w-5 h-5 ${className}`}
     >
       <path 
         fill="#FFC107" 
