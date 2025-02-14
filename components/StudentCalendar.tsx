@@ -267,9 +267,9 @@ const StudentCalendar: React.FC = () => {
     <div className="min-h-screen bg-gray-50 p-8">
       <Card className="max-w-4xl mx-auto">
         <CardHeader className="space-y-1">
-          <div className="flex items-center justify-between mb-4">
-            <CardTitle className="text-2xl font-bold flex items-center gap-2">
-              <CalendarIcon className="h-6 w-6" />
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-4">
+            <CardTitle className="text-xl sm:text-2xl font-bold flex items-center gap-2 whitespace-nowrap">
+              <CalendarIcon className="h-5 w-5 sm:h-6 sm:w-6" />
               Student Calendar
               <SyncStatus state={syncState} lastSynced={lastSynced} />
             </CardTitle>
