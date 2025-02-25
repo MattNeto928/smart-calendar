@@ -38,6 +38,7 @@ export function EditEventDialog({
   onSave,
   onDelete,
 }: EditEventDialogProps) {
+  const [isBackgroundFading, setIsBackgroundFading] = React.useState(false);
   const [editedEvent, setEditedEvent] = React.useState<Event>(() => {
     const defaultDate = event && event.date ? event.date : '';
     return {
@@ -77,9 +78,25 @@ export function EditEventDialog({
     onClose();
   };
 
+  const handleClose = () => {
+    setIsBackgroundFading(true);
+    setTimeout(() => {
+      onClose();
+      setIsBackgroundFading(false);
+    }, 200);
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md max-h-[500px] h-[500px] overflow-y-auto">
+    <div className="relative">
+      {isOpen && (
+        <div 
+          className={`fixed inset-0 bg-black/30 z-[49] transition-opacity duration-200 ${
+            isBackgroundFading ? 'opacity-0' : 'opacity-100'
+          }`} 
+        />
+      )}
+      <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="max-w-md max-h-[500px] h-[500px] overflow-y-auto z-50 relative">
         <DialogHeader>
           <DialogTitle>{event ? 'Edit Event' : 'Create Event'}</DialogTitle>
         </DialogHeader>
@@ -202,13 +219,18 @@ export function EditEventDialog({
           <div className="flex gap-2">
             <Button
               variant="outline"
-              onClick={onClose}
+              onClick={handleClose}
               type="button"
             >
               Cancel
             </Button>
             <Button
-              onClick={handleSave}
+              onClick={() => {
+                setIsBackgroundFading(true);
+                setTimeout(() => {
+                  handleSave();
+                }, 200);
+              }}
               type="submit"
               disabled={!editedEvent.title || !editedEvent.date}
             >
@@ -218,5 +240,6 @@ export function EditEventDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    </div>
   );
 }

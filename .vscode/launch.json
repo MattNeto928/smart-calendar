@@ -1,0 +1,22 @@
+{
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:student-calendar}/student-calendar-swift",
+            "name": "Debug student-calendar-swift (student-calendar-swift)",
+            "program": "${workspaceFolder:student-calendar}/student-calendar-swift/.build/debug/student-calendar-swift",
+            "preLaunchTask": "swift: Build Debug student-calendar-swift (student-calendar-swift)"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:student-calendar}/student-calendar-swift",
+            "name": "Release student-calendar-swift (student-calendar-swift)",
+            "program": "${workspaceFolder:student-calendar}/student-calendar-swift/.build/release/student-calendar-swift",
+            "preLaunchTask": "swift: Build Release student-calendar-swift (student-calendar-swift)"
+        }
+    ]
+}

@@ -5,17 +5,17 @@ import { ServiceException } from "@aws-sdk/smithy-client";
 let client: DynamoDBClient;
 try {
   console.log('Initializing DynamoDB client with:', {
-    region: process.env.AWS_REGION,
-    tableName: process.env.DYNAMODB_TABLE_NAME,
-    hasAccessKey: !!process.env.AWS_ACCESS_KEY_ID,
-    hasSecretKey: !!process.env.AWS_SECRET_ACCESS_KEY
+    region: process.env.EXPO_PUBLIC_AWS_REGION,
+    tableName: process.env.EXPO_PUBLIC_DYNAMODB_TABLE_NAME,
+    hasAccessKey: !!process.env.EXPO_PUBLIC_AWS_ACCESS_KEY_ID,
+    hasSecretKey: !!process.env.EXPO_PUBLIC_AWS_SECRET_ACCESS_KEY
   });
   
   client = new DynamoDBClient({
-    region: process.env.AWS_REGION,
+    region: process.env.EXPO_PUBLIC_AWS_REGION,
     credentials: {
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+      accessKeyId: process.env.EXPO_PUBLIC_AWS_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.EXPO_PUBLIC_AWS_SECRET_ACCESS_KEY!,
     },
   });
 } catch (error: unknown) {
@@ -28,22 +28,24 @@ export const docClient = DynamoDBDocumentClient.from(client);
 export interface CalendarEvent {
   userId: string;
   eventId: string;
-  title: string;
-  date: string;
-  type: 'test' | 'assignment' | 'meeting' | 'office_hours';
-  description?: string;
-  location?: string;
-  time?: string;
-  priority?: 'low' | 'medium' | 'high';
-  courseTitle?: string;
   courseCode?: string;
-  createdAt: number;
-  updatedAt: number;
+  courseTitle?: string;
+  createdAt: string;
+  date?: string;
+  description?: string;
+  id?: string;
+  location?: string;
+  priority?: string;
+  selected?: string;
+  time?: string;
+  title: string;
+  type?: string;
+  updatedAt: string;
 }
 
 export async function saveEvent(event: CalendarEvent) {
   const command = new PutCommand({
-    TableName: process.env.DYNAMODB_TABLE_NAME,
+    TableName: process.env.EXPO_PUBLIC_DYNAMODB_TABLE_NAME,
     Item: event,
   });
 
@@ -53,7 +55,7 @@ export async function saveEvent(event: CalendarEvent) {
 async function verifyTableExists() {
   try {
     const command = new QueryCommand({
-      TableName: process.env.DYNAMODB_TABLE_NAME,
+      TableName: process.env.EXPO_PUBLIC_DYNAMODB_TABLE_NAME,
       KeyConditionExpression: "userId = :userId",
       ExpressionAttributeValues: {
         ":userId": "test",
@@ -64,7 +66,7 @@ async function verifyTableExists() {
     return true;
   } catch (error: unknown) {
     if (error instanceof ServiceException && error.name === 'ResourceNotFoundException') {
-      console.error(`DynamoDB table '${process.env.DYNAMODB_TABLE_NAME}' not found. Please create the table with:
+      console.error(`DynamoDB table '${process.env.EXPO_PUBLIC_DYNAMODB_TABLE_NAME}' not found. Please create the table with:
         - Partition key: userId (String)
         - Sort key: eventId (String)`);
     }
@@ -75,7 +77,7 @@ async function verifyTableExists() {
 export async function getEvents(userId: string) {
   await verifyTableExists();
   const command = new QueryCommand({
-    TableName: process.env.DYNAMODB_TABLE_NAME,
+    TableName: process.env.EXPO_PUBLIC_DYNAMODB_TABLE_NAME,
     KeyConditionExpression: "userId = :userId",
     ExpressionAttributeValues: {
       ":userId": userId,
@@ -88,8 +90,8 @@ export async function getEvents(userId: string) {
   } catch (error: unknown) {
     console.error('DynamoDB Error:', {
       error,
-      tableName: process.env.DYNAMODB_TABLE_NAME,
-      region: process.env.AWS_REGION
+      tableName: process.env.EXPO_PUBLIC_DYNAMODB_TABLE_NAME,
+      region: process.env.EXPO_PUBLIC_AWS_REGION
     });
     throw error;
   }
@@ -97,7 +99,7 @@ export async function getEvents(userId: string) {
 
 export async function deleteEvent(userId: string, eventId: string) {
   const command = new DeleteCommand({
-    TableName: process.env.DYNAMODB_TABLE_NAME,
+    TableName: process.env.EXPO_PUBLIC_DYNAMODB_TABLE_NAME,
     Key: {
       userId,
       eventId,

@@ -1,0 +1,30 @@
+{
+  "cli": {
+    "version": ">= 15.0.12",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "NODE_OPTIONS": "--max-old-space-size=8192"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "NODE_OPTIONS": "--max-old-space-size=8192"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "env": {
+        "NODE_OPTIONS": "--max-old-space-size=8192"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
