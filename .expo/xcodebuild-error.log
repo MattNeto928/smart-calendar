@@ -1,0 +1,10 @@
+--- xcodebuild: WARNING: Using the first of multiple matching destinations:
+{ platform:iOS Simulator, id:22A60B11-B387-4009-94A1-D6540ABB5634, OS:18.2, name:iPad Air 13-inch (M2) }
+{ platform:iOS Simulator, id:22A60B11-B387-4009-94A1-D6540ABB5634, OS:18.2, name:iPad Air 13-inch (M2) }
+** BUILD FAILED **
+
+
+The following build commands failed:
+	PhaseScriptExecution [CP-User]\ [Hermes]\ Replace\ Hermes\ for\ the\ right\ configuration,\ if\ needed /Users/mattneto/Library/Developer/Xcode/DerivedData/studentcalendar-glrgqjojqrsylrfjgtbfrcffxcle/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/hermes-engine.build/Script-46EB2E0001CF90.sh (in target 'hermes-engine' from project 'Pods')
+	Building workspace studentcalendar with scheme studentcalendar and configuration Debug
+(2 failures)

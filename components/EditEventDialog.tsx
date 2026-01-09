@@ -64,13 +64,19 @@ export function EditEventDialog({
   };
 
   const handleDateChange = (dateStr: string) => {
-    // Create date with local timezone
+    // Parse the selected date
     const [year, month, day] = dateStr.split('-').map(Number);
-    const date = new Date(year, month - 1, day);
-    if (!isNaN(date.getTime())) {
-      const formattedDate = date.toDateString();
-      handleChange('date', formattedDate);
+    
+    if (isNaN(year) || isNaN(month) || isNaN(day)) {
+      console.error('Invalid date input:', dateStr);
+      return;
     }
+
+    // Format date as YYYY-MM-DD string (ISO format)
+    // This matches the mobile app's formatStandardDate function
+    const formattedDate = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+    console.log(`Formatted date: ${dateStr} → ${formattedDate}`);
+    handleChange('date', formattedDate);
   };
 
   const handleSave = () => {
@@ -98,8 +104,11 @@ export function EditEventDialog({
       <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-md max-h-[500px] h-[500px] overflow-y-auto z-50 relative">
         <DialogHeader>
-          <DialogTitle>{event ? 'Edit Event' : 'Create Event'}</DialogTitle>
+          <DialogTitle>
+            {event ? 'Edit Event' : 'Create Event'}
+          </DialogTitle>
         </DialogHeader>
+        
         <div className="space-y-4 py-4">
           <div className="grid gap-2">
             <label className="text-sm font-medium">Title</label>
@@ -116,7 +125,7 @@ export function EditEventDialog({
             <label className="text-sm font-medium">Date</label>
             <input
               type="date"
-              value={editedEvent.date ? new Date(editedEvent.date).toISOString().split('T')[0] : ''}
+              value={editedEvent.date || ''}
               onChange={(e) => handleDateChange(e.target.value)}
               className="w-full px-3 py-2 border rounded-md"
               required

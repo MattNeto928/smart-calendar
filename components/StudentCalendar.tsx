@@ -78,7 +78,7 @@ const StudentCalendar: React.FC = () => {
       const currentDate = new Date(year, month, i);
       days.push({
         date: currentDate,
-        events: events.filter(event => event.date === currentDate.toDateString())
+        events: events.filter(event => event.date === currentDate.toISOString().split('T')[0])
       });
     }
     
@@ -222,7 +222,7 @@ const StudentCalendar: React.FC = () => {
 
   const isToday = (date: Date): boolean => {
     const today = new Date();
-    return date.toDateString() === today.toDateString();
+    return date.toISOString().split('T')[0] === today.toISOString().split('T')[0];
   };
 
   // Load events from cloud on component mount
@@ -490,7 +490,7 @@ const StudentCalendar: React.FC = () => {
                   calendar-day aspect-square p-2 border rounded-lg bg-white
                   ${day.date ? 'hover:bg-gray-50 cursor-pointer transition-colors' : 'bg-gray-50'}
                   ${day.date && isToday(day.date) ? 'bg-blue-50 border-blue-200' : ''}
-                  ${day.date && selectedDate?.toDateString() === day.date.toDateString() 
+                  ${day.date && selectedDate?.toISOString().split('T')[0] === day.date.toISOString().split('T')[0] 
                     ? `ring-2 ${isDateFading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300 ring-blue-400` 
                     : ''}
                 `}
@@ -507,12 +507,15 @@ const StudentCalendar: React.FC = () => {
                           key={`${event.id}-${i}`}
                           className={`
                             text-xs rounded p-1.5 truncate border
-                            ${getEventColor(event.type, event.priority)}
+                            ${getEventColor(event.type, event.priority, !!event.canvasId)}
                             transition-all duration-200
                             hover:scale-[1.02]
                           `}
-                          title={`${event.title}${event.priority ? ` (${event.priority} priority)` : ''}`}
+                          title={`${event.title}${event.priority ? ` (${event.priority} priority)` : ''}${event.canvasId ? ' (Canvas)' : ''}`}
                         >
+                          {event.canvasId && (
+                            <span className="mr-1 inline-block w-2 h-2 bg-[#E41A2D] rounded-full" />
+                          )}
                           {event.title}
                         </div>
                       ))}
@@ -536,24 +539,43 @@ const StudentCalendar: React.FC = () => {
               </h3>
               <div className="space-y-2">
                 {events
-                  .filter(event => event.date === selectedDate.toDateString())
+                  .filter(event => event.date === selectedDate.toISOString().split('T')[0])
                   .map(event => (
                     <div
                       key={event.id}
-                      className={`p-3 rounded-lg ${getEventColor(event.type)}`}
+                      className={`p-3 rounded-lg ${getEventColor(event.type, event.priority, !!event.canvasId)}`}
                     >
                       <div className="flex items-center gap-2">
-                        <div className="font-medium flex-grow">{event.title}</div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEditEvent(event);
-                          }}
-                        >
-                          Edit
-                        </Button>
+                        <div className="font-medium flex-grow">
+                          {event.canvasId && (
+                            <span className="mr-2 inline-block px-1.5 py-0.5 text-xs rounded bg-[#E41A2D] text-white">Canvas</span>
+                          )}
+                          {event.title}
+                        </div>
+                        
+                        {event.canvasUrl ? (
+                          <a 
+                            href={event.canvasUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-[#E41A2D] hover:underline px-2 py-1"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            Open in Canvas
+                          </a>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditEvent(event);
+                            }}
+                          >
+                            Edit
+                          </Button>
+                        )}
+                        
                         {event.priority && (
                           <span className={`text-xs px-2 py-1 rounded-full ${
                             event.priority === 'high' ? 'bg-red-100 text-red-800' :
@@ -577,6 +599,11 @@ const StudentCalendar: React.FC = () => {
                       )}
                       {event.description && (
                         <div className="text-sm mt-1">{event.description}</div>
+                      )}
+                      {event.canvasType && (
+                        <div className="text-xs mt-1 text-gray-500">
+                          Type: {event.canvasType.charAt(0).toUpperCase() + event.canvasType.slice(1)}
+                        </div>
                       )}
                     </div>
                   ))}

@@ -151,6 +151,57 @@ export async function deleteEvent(userId: string, eventId: string) {
   await dynamoDB.delete(params).promise();
 }
 
+export async function updateEvent(eventId: string, eventDetails: Partial<CalendarEvent>) {
+  if (!eventDetails.userId) {
+    throw new Error('userId is required for updating an event');
+  }
+
+  // Create the update expression and attribute values
+  let updateExpression = 'SET ';
+  const expressionAttributeValues: Record<string, any> = {};
+  const expressionAttributeNames: Record<string, string> = {};
+
+  // Add updatedAt timestamp
+  updateExpression += '#updatedAt = :updatedAt, ';
+  expressionAttributeValues[':updatedAt'] = new Date().toISOString();
+  expressionAttributeNames['#updatedAt'] = 'updatedAt';
+
+  // Add all other fields to the update expression
+  Object.entries(eventDetails).forEach(([key, value]) => {
+    // Skip userId and eventId as they are part of the key
+    if (key !== 'userId' && key !== 'eventId') {
+      const attributeName = `#${key}`;
+      const attributeValue = `:${key}`;
+      
+      updateExpression += `${attributeName} = ${attributeValue}, `;
+      expressionAttributeValues[attributeValue] = value;
+      expressionAttributeNames[attributeName] = key;
+    }
+  });
+
+  // Remove trailing comma and space
+  updateExpression = updateExpression.slice(0, -2);
+
+  const params = {
+    TableName: process.env.EXPO_PUBLIC_DYNAMODB_TABLE_NAME,
+    Key: {
+      userId: eventDetails.userId,
+      eventId: eventId,
+    },
+    UpdateExpression: updateExpression,
+    ExpressionAttributeValues: expressionAttributeValues,
+    ExpressionAttributeNames: expressionAttributeNames,
+    ReturnValues: 'UPDATED_NEW'
+  };
+
+  try {
+    await dynamoDB.update(params).promise();
+  } catch (error) {
+    console.error('Failed to update event:', error);
+    throw error;
+  }
+}
+
 export async function deleteAllEvents(userId: string) {
   const events = await getEvents(userId);
   

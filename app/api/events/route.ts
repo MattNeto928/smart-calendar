@@ -39,8 +39,8 @@ export async function POST(request: Request) {
       ...event,
       userId: session.user.id,
       eventId: event.id,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      createdAt: new Date().toISOString(), // Use ISO string
+      updatedAt: new Date().toISOString(), // Use ISO string
     };
 
     await saveEvent(calendarEvent);

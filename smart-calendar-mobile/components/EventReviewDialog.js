@@ -151,7 +151,8 @@ const EventReviewDialog = ({
               { key: 'assignment', value: 'Assignment' },
               { key: 'test', value: 'Test' },
               { key: 'meeting', value: 'Meeting' },
-              { key: 'office_hours', value: 'Office Hours' }
+              { key: 'office_hours', value: 'Office Hours' },
+              { key: 'lecture', value: 'Lecture' }
             ]}
             save="key"
             defaultOption={{ 

@@ -8,8 +8,8 @@ export async function middleware(request: NextRequest) {
 
   if (isAuthPage) {
     if (token) {
-      // If user is already logged in, redirect to calendar
-      return NextResponse.redirect(new URL("/calendar", request.url));
+      // If user is already logged in, redirect to dashboard
+      return NextResponse.redirect(new URL("/dashboard", request.url));
     }
     // Allow access to auth page if not logged in
     return NextResponse.next();

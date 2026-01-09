@@ -198,7 +198,8 @@ export const AuthProvider = ({ children }) => {
           const sanitizedDescription = String(item.description || '').substring(0, 1024); // Truncate description to 1024 characters
           const sanitizedCourseCode = String(item.courseCode || '').substring(0, 255);
           const sanitizedCourseTitle = String(item.courseTitle || '').substring(0, 255);
-          const sanitizedDate = String(item.date || '').substring(0, 255);
+          // Preserve exact date format without conversion to ensure consistency
+          const sanitizedDate = item.date ? String(item.date) : '';
           const sanitizedId = String(item.id || '').substring(0, 255);
           const sanitizedLocation = String(item.location || '').substring(0, 255);
           const sanitizedPriority = String(item.priority || '').substring(0, 255);

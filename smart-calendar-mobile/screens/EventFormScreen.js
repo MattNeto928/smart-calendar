@@ -10,30 +10,49 @@ import {
   Animated, 
   Dimensions, 
   Platform,
-  ActivityIndicator
+  ActivityIndicator,
+  StatusBar,
+  SafeAreaView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import SyncNotification from '../components/SyncNotification';
 import EventReviewDialog from '../components/EventReviewDialog';
 import { SelectList } from 'react-native-dropdown-select-list';
-import { createEvent, updateEvent, deleteEvent } from '../lib/aws';
+import { saveEvent, updateEvent, deleteEvent } from '../lib/aws';
 import { geminiParser } from '../lib/gemini';
+import { formatStandardDate } from '../lib/dateUtils';
 import * as mime from 'react-native-mime-types';
 import * as FileSystem from 'expo-file-system';
+import LinearGradient from 'react-native-linear-gradient';
 
 // Keep track of active document picker state globally to prevent race conditions
 let isDocumentPickerActive = false;
+let documentPickerAttempted = false; // Track if we've already tried to open the picker
 
 export default function EventFormScreen({ navigation, route }) {
   const { user, syncEvents } = useAuth();
+  const { theme } = useTheme();
   const [syncNotification, setSyncNotification] = useState(null);
   const editingEvent = route.params?.event;
+  const uploadMode = route.params?.uploadMode;
+  const fromDashboard = route.params?.fromDashboard;
   const [title, setTitle] = useState(editingEvent?.title || '');
-  const defaultDate = editingEvent?.date ? new Date(editingEvent.date) : new Date();
+  // Parse date properly to avoid timezone issues
+  const defaultDate = editingEvent?.date 
+    ? (() => {
+        const [year, month, day] = editingEvent.date.split('-').map(num => parseInt(num, 10));
+        return new Date(year, month-1, day, 12, 0, 0, 0); // noon local time prevents timezone shifts
+      })() 
+    : (() => {
+        const now = new Date();
+        now.setHours(12, 0, 0, 0); // Set to noon to avoid timezone issues
+        return now;
+      })();
   const [date, setDate] = useState(defaultDate);
   const [tempDate, setTempDate] = useState(date);
   const [tempTime, setTempTime] = useState(new Date());
@@ -44,6 +63,8 @@ export default function EventFormScreen({ navigation, route }) {
   const [priority, setPriority] = useState(editingEvent?.priority || 'medium');
   const [courseTitle, setCourseTitle] = useState(editingEvent?.courseTitle || '');
   const [courseCode, setCourseCode] = useState(editingEvent?.courseCode || '');
+  const [isRecurring, setIsRecurring] = useState(editingEvent?.isRecurring || false);
+  const [recurrencePattern, setRecurrencePattern] = useState(editingEvent?.recurrencePattern || '');
   const [attachmentFilename, setAttachmentFilename] = useState('');
   const isMounted = React.useRef(true);
   const [isPickerActive, setIsPickerActive] = useState(false);
@@ -56,11 +77,67 @@ export default function EventFormScreen({ navigation, route }) {
   const [isParsing, setIsParsing] = useState(false);
 
   useEffect(() => {
+    console.log('EventFormScreen mounted, uploadMode:', uploadMode, 'fromDashboard:', fromDashboard);
+    console.log('Preselected file:', route.params?.preselectedFile);
     isMounted.current = true;
+    
     // Reset document picker state on component mount
     isDocumentPickerActive = false;
+    documentPickerAttempted = false;
+    
+    // Check if we have a preselected file
+    const preselectedFile = route.params?.preselectedFile;
+    
+    if (preselectedFile) {
+      console.log('Preselected file detected, processing directly');
+      
+      // Process the file directly
+      const timer = setTimeout(() => {
+        if (isMounted.current) {
+          // Clear the route params to prevent re-processing AFTER we've accessed the file
+          if (navigation && navigation.setParams) {
+            navigation.setParams({ 
+              preselectedFile: undefined,
+              uploadMode: undefined,
+              fromDashboard: undefined
+            });
+          }
+          handleDocumentUpload(preselectedFile);
+        }
+      }, 100);
+      
+      pickerTimeoutRef.current = timer;
+      
+    } 
+    // If no preselected file but uploadMode is true, open document picker
+    else if (uploadMode && !documentPickerAttempted) {
+      console.log('Upload mode detected, preparing document picker');
+      documentPickerAttempted = true;
+      
+      // First, clear the route params to prevent re-triggering
+      if (navigation && navigation.setParams) {
+        navigation.setParams({ 
+          uploadMode: undefined,
+          fromDashboard: undefined
+        });
+      }
+      
+      // Open document picker immediately but use a minimal timeout
+      // to ensure the component is mounted and ready
+      const timer = setTimeout(() => {
+        if (isMounted.current) {
+          console.log('Now opening document picker from upload mode');
+          
+          // If we came from dashboard, go back if user cancels
+          pickDocument(fromDashboard);
+        }
+      }, 100);
+      
+      pickerTimeoutRef.current = timer;
+    }
     
     return () => {
+      console.log('EventFormScreen unmounting');
       isMounted.current = false;
       // Clear any pending timeouts
       if (pickerTimeoutRef.current) {
@@ -68,8 +145,9 @@ export default function EventFormScreen({ navigation, route }) {
       }
       // Reset global picker state
       isDocumentPickerActive = false;
+      documentPickerAttempted = false;
     };
-  }, []);
+  }, [uploadMode, fromDashboard, navigation, route.params]);
 
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
@@ -108,7 +186,10 @@ export default function EventFormScreen({ navigation, route }) {
 
   const handleDateChange = (event, selectedDate) => {
     if (selectedDate) {
-      setTempDate(selectedDate);
+      // Keep hours at noon to avoid timezone issues
+      const newTempDate = new Date(selectedDate);
+      newTempDate.setHours(12, 0, 0, 0);
+      setTempDate(newTempDate);
     }
   };
 
@@ -119,7 +200,10 @@ export default function EventFormScreen({ navigation, route }) {
   };
 
   const handleConfirmDate = () => {
-    setDate(tempDate);
+    // Ensure we set the date with noon time to avoid timezone issues
+    const finalDate = new Date(tempDate);
+    finalDate.setHours(12, 0, 0, 0);
+    setDate(finalDate);
     setShowDatePicker(false);
   };
 
@@ -140,10 +224,16 @@ export default function EventFormScreen({ navigation, route }) {
       });
       setSyncNotification({ message: editingEvent ? 'Modifying event...' : 'Creating event...', type: 'syncing' });
       
+      // Use our standardized date formatting function to ensure consistency
+      const formattedDate = formatStandardDate(date);
+      
+      // Debug logging
+      console.log(`Event Form Date: ${date.toLocaleString()} → ${formattedDate}`);
+      
       const eventDetails = {
         userId: user.id,
         title,
-        date: date.toISOString().split('T')[0],
+        date: formattedDate,
         type,
         priority,
         description,
@@ -151,25 +241,49 @@ export default function EventFormScreen({ navigation, route }) {
         courseCode,
         courseTitle,
         time: time || null, // Keep time null if not selected
+        isRecurring,
+        recurrencePattern: isRecurring ? recurrencePattern || "Weekly" : null, // Set default pattern if missing
       };
 
       if (editingEvent) {
         await updateEvent(editingEvent.eventId, eventDetails);
       } else {
-        await createEvent(eventDetails);
+        // Generate a unique eventId for new events
+        const eventId = `event_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        await saveEvent({
+          ...eventDetails,
+          eventId,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
       }
 
       // Sync with cloud
       await syncEvents();
-      setSyncNotification({ 
+      
+      // Create notification message to pass back to the calendar screen
+      const notification = { 
         message: editingEvent ? 'Event successfully modified' : 'Event successfully created', 
         type: 'success',
         action: 'modify'
-      });
+      };
+      
+      setSyncNotification(notification);
       
       // Wait for notification to show before navigating back
       setTimeout(() => {
-        navigation.goBack();
+        // Pass notification to CalendarTab's CalendarMain screen
+        navigation.navigate('Main', {
+          screen: 'CalendarTab',
+          params: {
+            screen: 'CalendarMain',
+            params: {
+              notification,
+              refresh: true,
+              timestamp: Date.now()
+            }
+          }
+        });
       }, 1000);
     } catch (error) {
       console.error('Failed to save event:', error);
@@ -194,22 +308,26 @@ export default function EventFormScreen({ navigation, route }) {
     );
   };
 
-  const pickDocument = async () => {
-    console.log('Document picker requested');
+  const pickDocument = async (goBackOnCancel = false) => {
+    console.log('Document picker requested, goBackOnCancel:', goBackOnCancel);
     
     try {
-      // Reset states
-      isDocumentPickerActive = false;
-      setIsPickerActive(false);
-      
-      if (!isMounted.current) {
-        console.log('Component unmounted, aborting');
+      // Prevent multiple opens or reopening after unmount
+      if (isDocumentPickerActive || !isMounted.current) {
+        console.log('Document picker already active or component unmounted, aborting');
         return;
       }
       
-      // Set active state
+      // Set active state to prevent duplicate calls
       isDocumentPickerActive = true;
       setIsPickerActive(true);
+      
+      // Hide form UI if in uploadMode
+      if (uploadMode) {
+        // We'll use state to hide the form UI entirely
+        // This prevents any UI from showing behind the document picker
+        console.log('Upload mode active - hiding form UI');
+      }
       
       // Show notification
       setSyncNotification({ message: 'Select a document...', type: 'syncing' });
@@ -243,6 +361,12 @@ export default function EventFormScreen({ navigation, route }) {
         if (result.canceled || !result.assets || result.assets.length === 0) {
           console.log('Picking cancelled or no assets selected');
           setSyncNotification(null);
+          
+          // If we came from dashboard and user cancelled, go back
+          if (goBackOnCancel) {
+            console.log('Going back after cancel - came from dashboard');
+            setTimeout(() => navigation.goBack(), 100);
+          }
           return;
         }
         
@@ -272,6 +396,12 @@ export default function EventFormScreen({ navigation, route }) {
           if (result.canceled || !result.assets || result.assets.length === 0) {
             console.log('Document picking cancelled or no assets selected');
             setSyncNotification(null);
+            
+            // If we came from dashboard and user cancelled, go back
+            if (goBackOnCancel) {
+              console.log('Going back after cancel - came from document picker');
+              setTimeout(() => navigation.goBack(), 100);
+            }
             return;
           }
           
@@ -289,12 +419,26 @@ export default function EventFormScreen({ navigation, route }) {
           });
         }
       }
-    } finally {
-      // Immediately reset the picker states
-      isDocumentPickerActive = false;
-      if (isMounted.current) {
-        setIsPickerActive(false);
+    } catch (error) {
+      console.error('Unexpected document picker error:', error);
+      setSyncNotification({
+        message: 'Error opening document picker',
+        type: 'error'
+      });
+      
+      // If there was an error and we came from dashboard, go back
+      if (goBackOnCancel) {
+        console.log('Going back after error - came from dashboard');
+        setTimeout(() => navigation.goBack(), 500);
       }
+    } finally {
+      // Reset the picker states
+      setTimeout(() => {
+        isDocumentPickerActive = false;
+        if (isMounted.current) {
+          setIsPickerActive(false);
+        }
+      }, 500); // Small delay to prevent race conditions
     }
   };
 
@@ -395,13 +539,27 @@ export default function EventFormScreen({ navigation, route }) {
     if (reviewedEvent.description) setDescription(reviewedEvent.description);
     if (reviewedEvent.location) setLocation(reviewedEvent.location);
     if (reviewedEvent.time) setTime(reviewedEvent.time);
-    if (reviewedEvent.date) setDate(new Date(reviewedEvent.date));
+    if (reviewedEvent.date) {
+      // Parse date with noon time to avoid timezone issues
+      const [year, month, day] = reviewedEvent.date.split('-').map(num => parseInt(num, 10));
+      setDate(new Date(year, month-1, day, 12, 0, 0, 0));
+    }
     if (reviewedEvent.courseCode) setCourseCode(reviewedEvent.courseCode);
     if (reviewedEvent.courseTitle) setCourseTitle(reviewedEvent.courseTitle);
     if (reviewedEvent.priority) setPriority(reviewedEvent.priority);
     
     // Close the dialog
     setReviewDialogVisible(false);
+    
+    // Show the form UI if it was previously hidden in upload mode
+    if (uploadMode) {
+      // Wait a bit to ensure dialog is fully closed
+      setTimeout(() => {
+        // We stay on this screen with populated fields, but now visible
+        const formScrollView = document.querySelector('.form-scrollview');
+        if (formScrollView) formScrollView.style.opacity = 1;
+      }, 300);
+    }
     
     // Show a success notification
     setSyncNotification({ 
@@ -420,6 +578,14 @@ export default function EventFormScreen({ navigation, route }) {
     setHasMultipleEvents(false);
     setIsParsing(false);
     
+    // If we're in upload mode and the user cancels, go back to previous screen
+    if (fromDashboard) {
+      // Wait a bit to ensure dialog is fully closed
+      setTimeout(() => {
+        navigation.goBack();
+      }, 300);
+    }
+    
     // Show notification
     setSyncNotification({
       message: 'Event review cancelled', 
@@ -429,86 +595,113 @@ export default function EventFormScreen({ navigation, route }) {
 
 
   return (
-    <>
-      <EventReviewDialog
-        isVisible={reviewDialogVisible}
-        event={parsedEvent}
-        onAccept={handleAcceptReviewedEvent}
-        onDismiss={handleDismissReview}
-        multipleEvents={hasMultipleEvents}
-      />
+    <View style={{ flex: 1, backgroundColor: theme.primary }}>
+      <StatusBar barStyle="light-content" backgroundColor={theme.primary} />
       
-      <Animated.View
-        style={[styles.overlay, {
-          opacity: fadeAnim,
-          pointerEvents: showDatePicker || showTimePicker ? 'auto' : 'none'
-        }]}
-      />
-      {showDatePicker && (
-        <Animated.View
-          style={[styles.pickerContainer, {
-            transform: [{ translateY: slideAnim }]
-          }]}
-        >
-          <View style={styles.pickerHeader}>
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={() => setShowDatePicker(false)}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-            <Text style={styles.pickerTitle}>Select Date</Text>
-            <TouchableOpacity 
-              style={styles.confirmButton}
-              onPress={handleConfirmDate}
-            >
-              <Text style={styles.confirmButtonText}>Confirm</Text>
-            </TouchableOpacity>
-          </View>
-          <DateTimePicker
-            value={tempDate}
-            mode="date"
-            display="spinner"
-            onChange={handleDateChange}
-            style={styles.picker}
-          />
-        </Animated.View>
-      )}
-
-      {showTimePicker && (
-        <Animated.View 
-          style={[styles.pickerContainer, {
-            transform: [{ translateY: slideAnim }]
-          }]}
-        >
-          <View style={styles.pickerHeader}>
-            <TouchableOpacity 
-              style={styles.cancelButton}
-              onPress={() => setShowTimePicker(false)}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-            <Text style={styles.pickerTitle}>Select Time</Text>
-            <TouchableOpacity
-              style={styles.confirmButton}
-              onPress={handleConfirmTime}
-            >
-              <Text style={styles.confirmButtonText}>Confirm</Text>
-            </TouchableOpacity>
-          </View>
-          <DateTimePicker
-            value={tempTime}
-            mode="time"
-            display="spinner"
-            onChange={handleTimeChange}
-            style={styles.picker}
-          />
-        </Animated.View>
-      )}
-
-      <ScrollView style={styles.container}>
-        <Text style={styles.title}>{editingEvent ? 'Edit Event' : 'Add Event'}</Text>
+      {/* Extended header background */}
+      <View style={styles.headerBackgroundExtended}>
+        <LinearGradient
+          colors={[theme.primary, theme.primaryDark]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.headerGradient}
+        />
+      </View>
+      
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={24} color="#fff" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>{editingEvent ? 'Edit Event' : 'Add Event'}</Text>
+          <View style={styles.rightPlaceholder} />
+        </View>
         
+        <View style={styles.bodyContainer}>
+          <EventReviewDialog
+            isVisible={reviewDialogVisible}
+            event={parsedEvent}
+            onAccept={handleAcceptReviewedEvent}
+            onDismiss={handleDismissReview}
+            multipleEvents={hasMultipleEvents}
+          />
+          
+          <Animated.View
+            style={[styles.overlay, {
+              opacity: fadeAnim,
+              pointerEvents: showDatePicker || showTimePicker ? 'auto' : 'none'
+            }]}
+          />
+          {showDatePicker && (
+            <Animated.View
+              style={[styles.pickerContainer, {
+                transform: [{ translateY: slideAnim }]
+              }]}
+            >
+              <View style={styles.pickerHeader}>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={() => setShowDatePicker(false)}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <Text style={styles.pickerTitle}>Select Date</Text>
+                <TouchableOpacity 
+                  style={styles.confirmButton}
+                  onPress={handleConfirmDate}
+                >
+                  <Text style={styles.confirmButtonText}>Confirm</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={tempDate}
+                mode="date"
+                display="spinner"
+                onChange={handleDateChange}
+                style={styles.picker}
+              />
+            </Animated.View>
+          )}
+
+          {showTimePicker && (
+            <Animated.View 
+              style={[styles.pickerContainer, {
+                transform: [{ translateY: slideAnim }]
+              }]}
+            >
+              <View style={styles.pickerHeader}>
+                <TouchableOpacity 
+                  style={styles.cancelButton}
+                  onPress={() => setShowTimePicker(false)}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <Text style={styles.pickerTitle}>Select Time</Text>
+                <TouchableOpacity
+                  style={styles.confirmButton}
+                  onPress={handleConfirmTime}
+                >
+                  <Text style={styles.confirmButtonText}>Confirm</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={tempTime}
+                mode="time"
+                display="spinner"
+                onChange={handleTimeChange}
+                style={styles.picker}
+              />
+            </Animated.View>
+          )}
+
+          <ScrollView 
+            style={[
+              styles.scrollContent, 
+              (uploadMode || isPickerActive) && { display: 'none' } // Completely hide form when picking
+            ]}
+            className="event-form"
+            contentContainerStyle={styles.contentContainer}
+          >
         <Text style={styles.label}>Title</Text>
         <TextInput
           placeholder="Event Title"
@@ -520,7 +713,13 @@ export default function EventFormScreen({ navigation, route }) {
         <Text style={styles.label}>Date</Text>
         <TouchableOpacity 
           style={[styles.dateButton, styles.interactiveField]}
-          onPress={() => setShowDatePicker(true)}
+          onPress={() => {
+            // Ensure we're using the correct date with noon time to avoid timezone issues
+            const newTempDate = new Date(date);
+            newTempDate.setHours(12, 0, 0, 0);
+            setTempDate(newTempDate);
+            setShowDatePicker(true);
+          }}
         >
           <View style={styles.dateButtonContent}>
             <Ionicons name="calendar" size={20} color="#666" />
@@ -552,7 +751,8 @@ export default function EventFormScreen({ navigation, route }) {
             { key: 'assignment', value: 'Assignment' },
             { key: 'test', value: 'Test' },
             { key: 'meeting', value: 'Meeting' },
-            { key: 'office_hours', value: 'Office Hours' }
+            { key: 'office_hours', value: 'Office Hours' },
+            { key: 'lecture', value: 'Lecture' }
           ]}
           save="key"
           defaultOption={{ key: type, value: type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' ') }}
@@ -591,6 +791,35 @@ export default function EventFormScreen({ navigation, route }) {
           onChangeText={setCourseTitle}
           style={styles.input}
         />
+        
+        <Text style={styles.label}>Recurring Event</Text>
+        <View style={styles.switchContainer}>
+          <Text style={styles.switchLabel}>Is this a recurring event?</Text>
+          <TouchableOpacity 
+            style={[
+              styles.toggleButton, 
+              isRecurring ? styles.toggleButtonActive : styles.toggleButtonInactive
+            ]}
+            onPress={() => setIsRecurring(!isRecurring)}
+          >
+            <View style={[
+              styles.toggleHandle, 
+              isRecurring ? styles.toggleHandleActive : styles.toggleHandleInactive
+            ]} />
+          </TouchableOpacity>
+        </View>
+        
+        {isRecurring && (
+          <>
+            <Text style={styles.label}>Recurrence Pattern (optional)</Text>
+            <TextInput
+              placeholder="e.g., Weekly on Mondays and Wednesdays"
+              value={recurrencePattern}
+              onChangeText={setRecurrencePattern}
+              style={styles.input}
+            />
+          </>
+        )}
 
         <Text style={styles.label}>Location (optional)</Text>
         <TextInput
@@ -624,15 +853,30 @@ export default function EventFormScreen({ navigation, route }) {
                 
                 // Sync with cloud
                 await syncEvents();
-                setSyncNotification({ 
+                
+                // Create notification to pass back to Calendar screen
+                const notification = { 
                   message: 'Event successfully deleted', 
                   type: 'success',
                   action: 'delete'
-                });
+                };
+                
+                setSyncNotification(notification);
                 
                 // Wait for notification to show before navigating back
                 setTimeout(() => {
-                  navigation.goBack();
+                  // Pass notification to CalendarTab's CalendarMain screen
+                  navigation.navigate('Main', {
+                    screen: 'CalendarTab',
+                    params: {
+                      screen: 'CalendarMain',
+                      params: {
+                        notification,
+                        refresh: true,
+                        timestamp: Date.now()
+                      }
+                    }
+                  });
                 }, 1000);
               } catch (error) {
                 console.error('Failed to delete event:', error);
@@ -647,45 +891,89 @@ export default function EventFormScreen({ navigation, route }) {
             <Text style={styles.deleteButtonText}>Delete Event</Text>
           </TouchableOpacity>
         )}
-
-        <TouchableOpacity 
-          style={[
-            styles.uploadButton,
-            isPickerActive && styles.uploadButtonDisabled
-          ]} 
-          onPress={pickDocument}
-          disabled={isPickerActive}
-        >
-          <Text style={styles.uploadButtonText}>
-            {isPickerActive ? 'Processing...' : 'Upload File'}
-          </Text>
-        </TouchableOpacity>
-      </ScrollView>
-      {syncNotification && (
-        <SyncNotification
-          message={syncNotification.message}
-          type={syncNotification.type}
-          onDismiss={() => setSyncNotification(null)}
-        />
-      )}
-      
-      {/* Overlay while parsing */}
-      {isParsing && (
-        <View style={styles.parsingOverlay}>
-          <View style={styles.parsingCard}>
-            <Text style={styles.parsingTitle}>Analyzing Document</Text>
-            <Text style={styles.parsingText}>
-              Please wait while we extract event information from your document...
-            </Text>
-            <ActivityIndicator size="large" color="#2563eb" style={{marginVertical: 20}} />
-          </View>
+          </ScrollView>
+          
+          {syncNotification && (
+            <SyncNotification
+              message={syncNotification.message}
+              type={syncNotification.type}
+              onDismiss={() => setSyncNotification(null)}
+            />
+          )}
+          
+          {/* Overlay while parsing */}
+          {isParsing && (
+            <View style={styles.parsingOverlay}>
+              <View style={styles.parsingCard}>
+                <Text style={styles.parsingTitle}>Analyzing Document</Text>
+                <Text style={styles.parsingText}>
+                  Please wait while we extract event information from your document...
+                </Text>
+                <ActivityIndicator size="large" color={theme.primary} style={{marginVertical: 20}} />
+              </View>
+            </View>
+          )}
         </View>
-      )}
-    </>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  // Header styles
+  headerBackgroundExtended: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 140,
+    zIndex: 1,
+  },
+  headerGradient: {
+    flex: 1,
+  },
+  safeArea: {
+    flex: 1,
+    zIndex: 2,
+  },
+  header: {
+    height: 70,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+  },
+  backButton: {
+    padding: 10,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#fff',
+    letterSpacing: 0.3,
+  },
+  rightPlaceholder: {
+    width: 40,
+  },
+  bodyContainer: {
+    flex: 1,
+    backgroundColor: '#f8f9fa',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    overflow: 'hidden',
+  },
+  scrollContent: {
+    flex: 1,
+    paddingHorizontal: 15,
+    paddingTop: 15,
+  },
+  contentContainer: {
+    paddingBottom: 30,
+  },
+  
+  // Original styles
   parsingOverlay: {
     position: 'absolute',
     top: 0,
@@ -935,5 +1223,40 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  switchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+    paddingHorizontal: 4,
+  },
+  switchLabel: {
+    fontSize: 16,
+    color: '#444',
+  },
+  toggleButton: {
+    width: 50,
+    height: 28,
+    borderRadius: 14,
+    padding: 2,
+  },
+  toggleButtonActive: {
+    backgroundColor: '#007bff',
+  },
+  toggleButtonInactive: {
+    backgroundColor: '#ccc',
+  },
+  toggleHandle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'white',
+  },
+  toggleHandleActive: {
+    transform: [{ translateX: 22 }],
+  },
+  toggleHandleInactive: {
+    transform: [{ translateX: 0 }],
   },
 });

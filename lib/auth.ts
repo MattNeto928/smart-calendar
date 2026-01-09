@@ -24,6 +24,7 @@ export const authOptions = {
       if (account?.provider === 'google' && token.email) {
         token.id = token.email; // Use email as a stable identifier
       }
+      
       return token;
     },
     async session({ session, token }: { session: Session; token: JWT }) {

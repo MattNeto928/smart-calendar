@@ -1,10 +1,12 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, Modal, Pressable, Animated } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function UserProfile({ onClose }) {
   const { user, signOut } = useAuth();
+  const { theme } = useTheme();
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -22,7 +24,10 @@ export default function UserProfile({ onClose }) {
       toValue: 0,
       duration: 150,
       useNativeDriver: true,
-    }).start(onClose);
+    }).start(() => {
+      // Close the profile menu
+      onClose();
+    });
   };
 
   const handleSignOut = () => {
@@ -31,40 +36,46 @@ export default function UserProfile({ onClose }) {
   };
 
   return (
-    <Modal
-      transparent={true}
-      animationType="none"
-      visible={true}
-      onRequestClose={onClose}
-    >
-      <Animated.View style={[styles.backdrop, { opacity: fadeAnim }]} >
-        <Pressable style={styles.pressable} onPress={handleClose}>
-        <Pressable style={styles.container}>
-          <View style={styles.header}>
-            {user?.picture ? (
-              <Image 
-                source={{ uri: user.picture }} 
-                style={styles.avatar}
-              />
-            ) : (
-              <View style={[styles.avatar, styles.avatarFallback]}>
-                <Ionicons name="person-circle" size={28} color="#6b7280" />
+    <>
+      <Modal
+        transparent={true}
+        animationType="none"
+        visible={true}
+        onRequestClose={onClose}
+      >
+        <Animated.View style={[styles.backdrop, { opacity: fadeAnim }]} >
+          <Pressable style={styles.pressable} onPress={handleClose}>
+            <Pressable style={styles.container}>
+              <View style={styles.header}>
+                {user?.picture ? (
+                  <Image 
+                    source={{ uri: user.picture }} 
+                    style={styles.avatar}
+                  />
+                ) : (
+                  <View style={[styles.avatar, styles.avatarFallback]}>
+                    <Ionicons name="person-circle" size={28} color="#6b7280" />
+                  </View>
+                )}
+                <View style={styles.userInfo}>
+                  <Text style={styles.name}>{user?.name}</Text>
+                  <Text style={styles.email}>{user?.email}</Text>
+                </View>
               </View>
-            )}
-            <View style={styles.userInfo}>
-              <Text style={styles.name}>{user?.name}</Text>
-              <Text style={styles.email}>{user?.email}</Text>
-            </View>
-          </View>
-          <View style={styles.divider} />
-          <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
-            <Ionicons name="log-out" size={20} color="#dc2626" style={styles.signOutIcon} />
-            <Text style={styles.signOutButtonText}>Sign out</Text>
-          </TouchableOpacity>
-        </Pressable>
-        </Pressable>
-      </Animated.View>
-    </Modal>
+              <View style={styles.divider} />
+
+              {/* Sign Out Button */}
+              <TouchableOpacity style={styles.menuButton} onPress={handleSignOut}>
+                <Ionicons name="log-out" size={20} color="#dc2626" style={styles.menuIcon} />
+                <Text style={styles.signOutButtonText}>Sign out</Text>
+              </TouchableOpacity>
+            </Pressable>
+          </Pressable>
+        </Animated.View>
+      </Modal>
+
+      
+    </>
   );
 }
 
@@ -128,15 +139,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#f3f4f6',
     marginHorizontal: 16,
   },
-  signOutButton: {
+  menuButton: {
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
   },
-  signOutIcon: {
+  menuIcon: {
     marginRight: 4,
+  },
+  menuButtonText: {
+    fontFamily: 'Roboto-Bold',
+    fontSize: 14,
   },
   signOutButtonText: {
     color: '#dc2626',

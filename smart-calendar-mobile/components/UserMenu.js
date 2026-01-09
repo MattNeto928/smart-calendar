@@ -1,4 +1,4 @@
-rimport React from 'react';
+import React from 'react';
 import { View, Text, TouchableOpacity, Modal, StyleSheet, Pressable, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';

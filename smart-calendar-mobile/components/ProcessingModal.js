@@ -81,8 +81,8 @@ export default function ProcessingModal({ stage, progress }) {
     };
   }, [progress]);
 
-  // Get current stage information
-  const currentStage = STAGES[stage];
+  // Get current stage information - use a default if stage is invalid
+  const currentStage = STAGES[stage] || STAGES.uploading;
   
   // Determine which stages are complete
   const isUploadingComplete = stage !== 'uploading' || progress >= 33;

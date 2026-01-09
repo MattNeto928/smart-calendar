@@ -36,7 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = async () => {
     setIsLoading(true);
     try {
-      await nextAuthSignIn('google', { callbackUrl: '/calendar' });
+      await nextAuthSignIn('google', { callbackUrl: '/dashboard' });
     } catch (error) {
       console.error('Failed to sign in:', error);
       setIsLoading(false);

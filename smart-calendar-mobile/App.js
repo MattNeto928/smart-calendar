@@ -6,6 +6,7 @@ import * as Font from 'expo-font';
 import AppNavigator from './navigation/AppNavigator';
 import AuthScreen from './screens/AuthScreen';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { DynamoDB } from 'aws-sdk';
 
 // Configure AWS
@@ -55,7 +56,9 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <AppContent />
+        <ThemeProvider>
+          <AppContent />
+        </ThemeProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );

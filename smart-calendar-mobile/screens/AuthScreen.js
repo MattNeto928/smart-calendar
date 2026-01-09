@@ -3,16 +3,18 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image } from 'rea
 // Use Expo's LinearGradient instead of react-native-linear-gradient
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { GoogleIcon } from '../components/GoogleIcon';
 import { UploadIcon, OrganizeIcon, CloudIcon } from '../components/FeatureIcons';
 
 export default function AuthScreen() {
   const { signIn } = useAuth();
+  const { theme } = useTheme();
   const currentYear = new Date().getFullYear();
 
   const FeatureCard = ({ title, description, Icon }) => (
     <View style={styles.featureCard}>
-      <Icon size={40} color="#007bff" />
+      <Icon size={40} color={theme.primary} />
       <Text style={styles.featureTitle}>{title}</Text>
       <Text style={styles.featureDescription}>{description}</Text>
     </View>
@@ -37,12 +39,12 @@ export default function AuthScreen() {
       {/* Hero Section */}
       <View style={styles.heroSection}>
         <Text style={styles.mainTitle}>
-          Your Academic Life, <Text style={styles.highlight}>Organized</Text>
+          Your Academic Life, <Text style={[styles.highlight, { color: theme.primary }]}>Organized</Text>
         </Text>
         <Text style={styles.subtitle}>
           Transform your syllabi and course documents into a beautifully organized calendar with AI-powered parsing.
         </Text>
-        <TouchableOpacity style={styles.mainButton} onPress={signIn}>
+        <TouchableOpacity style={[styles.mainButton, { backgroundColor: theme.primary }]} onPress={signIn}>
           <Text style={styles.mainButtonText}>Get Started Free</Text>
         </TouchableOpacity>
       </View>
@@ -69,7 +71,7 @@ export default function AuthScreen() {
         {/* CTA Section */}
         <View style={styles.ctaSection}>
           <Text style={styles.ctaTitle}>Ready to Get Organized?</Text>
-          <TouchableOpacity style={styles.signInButton} onPress={signIn}>
+          <TouchableOpacity style={[styles.signInButton, { backgroundColor: theme.primary }]} onPress={signIn}>
             <View style={styles.signInButtonContent}>
               <GoogleIcon size={24} />
               <Text style={styles.signInButtonText}>Sign in with Google</Text>
@@ -121,7 +123,7 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   highlight: {
-    color: '#007bff',
+    // color set dynamically with theme.primary
   },
   subtitle: {
     fontSize: 18,
@@ -131,7 +133,7 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   mainButton: {
-    backgroundColor: '#007bff',
+    // backgroundColor set dynamically with theme.primary
     paddingVertical: 15,
     paddingHorizontal: 30,
     borderRadius: 25,
@@ -186,7 +188,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   signInButton: {
-    backgroundColor: '#007bff',
+    // backgroundColor set dynamically with theme.primary
     paddingVertical: 12,
     paddingHorizontal: 30,
     borderRadius: 25,

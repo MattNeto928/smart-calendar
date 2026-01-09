@@ -46,7 +46,7 @@ export class GeminiParser {
       const genAI = new GoogleGenerativeAI(apiKey);
       // Use a different model version - the current one might be having issues
       this.model = genAI.getGenerativeModel({ 
-        model: "gemini-1.5-flash-latest", 
+        model: "gemini-3-flash-preview", 
         safetySettings: [
           {
             category: "HARM_CATEGORY_HARASSMENT",
@@ -242,11 +242,11 @@ Recurring event:
           }
 
           // Check for recurring events (either null date, empty date, or "Recurring" as the date)
-          const isRecurringEvent = event.type === 'office_hours' && 
-                                  (!event.date || 
+          // This applies to ANY event type, not just office_hours
+          const isRecurringEvent = !event.date || 
                                    event.date.trim() === '' || 
                                    event.date === 'Recurring' ||
-                                   event.date.toLowerCase().includes('recurring'));
+                                   event.date.toLowerCase().includes('recurring');
           
           // For recurring events, generate a future date based on day of week
           let eventDate = event.date;
@@ -329,7 +329,7 @@ Recurring event:
             const processedEvent: ExtractedEvent = {
               id: Math.random().toString(36).substring(7),
               title: event.title,
-              date: new Date(eventDate).toDateString(), // This ensures consistent date format
+              date: new Date(eventDate).toISOString().split('T')[0], // Use ISO format YYYY-MM-DD
               type: event.type as ExtractedEvent['type'],
               description: event.description,
               location: event.location || classLocation, // Use class location as fallback
@@ -347,7 +347,7 @@ Recurring event:
             const processedEvent: ExtractedEvent = {
               id: Math.random().toString(36).substring(7),
               title: event.title,
-              date: today.toDateString(),
+              date: today.toISOString().split('T')[0],
               type: event.type as ExtractedEvent['type'],
               description: event.description ? event.description + " [DATE MISSING IN ORIGINAL]" : "[DATE MISSING IN ORIGINAL]",
               location: event.location || classLocation,
@@ -379,44 +379,9 @@ Recurring event:
         return [];
       }
 
-      // If the file is a PDF, we can try to handle it directly for now
-      // This is a workaround for the type error issue
+      // Log file type for debugging
       if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
-        console.log('Processing PDF file, using fixed sample data instead of AI due to API limitations');
-        // Return some fixed sample events for now - edit these based on what's relevant for the user
-        const today = new Date();
-        const tomorrow = new Date(today);
-        tomorrow.setDate(today.getDate() + 1);
-        
-        // For office hours, create events for next occurrences of specific days
-        const nextTuesday = new Date(today);
-        nextTuesday.setDate(today.getDate() + ((2 - today.getDay() + 7) % 7));
-        
-        const nextThursday = new Date(today);
-        nextThursday.setDate(today.getDate() + ((4 - today.getDay() + 7) % 7));
-        
-        return [
-          {
-            id: Math.random().toString(36).substring(7),
-            title: "Chuanyi Ji Office Hours (Tuesday)",
-            date: nextTuesday.toDateString(),
-            type: "office_hours",
-            time: "05:15 PM",
-            location: "Klaus Advanced Computing 2456",
-            description: "After classes - Tues: min (5:15p, all questions explained)",
-            priority: "low"
-          },
-          {
-            id: Math.random().toString(36).substring(7),
-            title: "Chuanyi Ji Office Hours (Thursday)",
-            date: nextThursday.toDateString(),
-            type: "office_hours",
-            time: "03:00 PM",
-            location: "Klaus Advanced Computing 2456",
-            description: "After classes - Thurs: till all questions answered; or by appointment.",
-            priority: "low"
-          }
-        ];
+        console.log('Processing PDF file with Gemini API');
       }
       
       // Try calling Gemini API with more robust error handling
@@ -425,7 +390,7 @@ Recurring event:
         try {
           // Create a timeout promise to prevent hanging
           const timeoutPromise = new Promise<string>((_, reject) => {
-            setTimeout(() => reject(new Error('Gemini API request timed out')), 30000);
+            setTimeout(() => reject(new Error('Gemini API request timed out')), 60000);
           });
           
           // Create the API call promise
@@ -499,12 +464,12 @@ Recurring event:
               
               if (dayMatches) {
                 const nextDateForDay = this.getNextOccurrenceOfDay(dayMatches.day, dayMatches.dayNumber);
-                eventDate = nextDateForDay.toDateString();
+                eventDate = nextDateForDay.toISOString().split('T')[0];
               } else {
                 // Use tomorrow as fallback
                 const tomorrow = new Date(today);
                 tomorrow.setDate(today.getDate() + 1);
-                eventDate = tomorrow.toDateString();
+                eventDate = tomorrow.toISOString().split('T')[0];
               }
               
               return { ...event, date: eventDate };
@@ -512,7 +477,7 @@ Recurring event:
             
             // Fix any invalid dates
             if (!event.date || (typeof event.date === 'string' && isNaN(new Date(event.date).getTime()))) {
-              return { ...event, date: new Date().toDateString() };
+              return { ...event, date: new Date().toISOString().split('T')[0] };
             }
             
             return event;

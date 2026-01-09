@@ -1,3 +1,22 @@
 {
-  "expo": {}
+  "expo": {
+    "name": "student-calendar",
+    "slug": "student-calendar",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "entryPoint": "./index.js",
+    "ios": {
+      "bundleIdentifier": "com.mattneto.student-calendar",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.mattneto.studentcalendar",
+      "adaptiveIcon": {
+        "backgroundColor": "#ffffff"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
 }
