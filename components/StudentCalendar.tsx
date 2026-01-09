@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState } from 'react';
-import { Calendar as CalendarIcon, Cloud, RefreshCw } from 'lucide-react';
+import { Calendar as CalendarIcon, Cloud, RefreshCw, Download } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { geminiParser } from '@/lib/gemini';
@@ -13,6 +13,7 @@ import { ClearCalendarDialog } from './ClearCalendarDialog';
 import { UserProfile } from './UserProfile';
 import { SyncNotification } from './SyncNotification';
 import { ProcessingModal } from './ProcessingModal';
+import { ExportCalendarDialog } from './ExportCalendarDialog';
 
 interface Event {
   id: string;
@@ -57,6 +58,7 @@ const StudentCalendar: React.FC = () => {
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showClearDialog, setShowClearDialog] = useState(false);
+  const [showExportDialog, setShowExportDialog] = useState(false);
 
   const monthNames: string[] = [
     "January", "February", "March", "April", "May", "June",
@@ -441,6 +443,15 @@ const StudentCalendar: React.FC = () => {
                 >
                   <span>+ Create Event</span>
                 </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowExportDialog(true)}
+                  className="flex items-center gap-2"
+                  disabled={events.length === 0}
+                >
+                  <Download className="h-4 w-4" />
+                  <span>Export</span>
+                </Button>
                 <label htmlFor="file-upload">
                   <Button 
                     variant="outline" 
@@ -663,6 +674,12 @@ const StudentCalendar: React.FC = () => {
         isOpen={showClearDialog}
         onClose={() => setShowClearDialog(false)}
         onConfirm={handleClearCalendar}
+      />
+
+      <ExportCalendarDialog
+        isOpen={showExportDialog}
+        onClose={() => setShowExportDialog(false)}
+        events={events}
       />
 
       {isProcessing && processingStage && (
