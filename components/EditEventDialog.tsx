@@ -38,7 +38,6 @@ export function EditEventDialog({
   onSave,
   onDelete,
 }: EditEventDialogProps) {
-  const [isBackgroundFading, setIsBackgroundFading] = React.useState(false);
   const [editedEvent, setEditedEvent] = React.useState<Event>(() => {
     const defaultDate = event && event.date ? event.date : '';
     return {
@@ -84,25 +83,9 @@ export function EditEventDialog({
     onClose();
   };
 
-  const handleClose = () => {
-    setIsBackgroundFading(true);
-    setTimeout(() => {
-      onClose();
-      setIsBackgroundFading(false);
-    }, 200);
-  };
-
   return (
-    <div className="relative">
-      {isOpen && (
-        <div 
-          className={`fixed inset-0 bg-black/30 z-[49] transition-opacity duration-200 ${
-            isBackgroundFading ? 'opacity-0' : 'opacity-100'
-          }`} 
-        />
-      )}
-      <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-md max-h-[500px] h-[500px] overflow-y-auto z-50 relative">
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-md max-h-[500px] h-[500px] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {event ? 'Edit Event' : 'Create Event'}
@@ -228,18 +211,13 @@ export function EditEventDialog({
           <div className="flex gap-2">
             <Button
               variant="outline"
-              onClick={handleClose}
+              onClick={onClose}
               type="button"
             >
               Cancel
             </Button>
             <Button
-              onClick={() => {
-                setIsBackgroundFading(true);
-                setTimeout(() => {
-                  handleSave();
-                }, 200);
-              }}
+              onClick={handleSave}
               type="submit"
               disabled={!editedEvent.title || !editedEvent.date}
             >
@@ -249,6 +227,5 @@ export function EditEventDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-    </div>
   );
 }
