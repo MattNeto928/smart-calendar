@@ -1,8 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from 'react';
-import { LogOut, Settings, User as UserIcon } from 'lucide-react';
-import { Button } from './ui/button';
+import { LogOut, User as UserIcon } from 'lucide-react';
 import Image from 'next/image';
 import { User as AuthUser } from '@/lib/auth-context';
 

@@ -17,7 +17,7 @@ export function formatStandardDate(date: Date | string): string {
   
   try {
     // If date is a string, convert to Date object
-    let dateObj = typeof date === 'string' ? new Date(date) : date;
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
     
     if (isNaN(dateObj.getTime())) {
       throw new Error('Invalid date format');

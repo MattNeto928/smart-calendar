@@ -15,14 +15,6 @@ export function SyncNotification({ message, type, onClose, onCloseStart, action 
   const [isVisible, setIsVisible] = useState(true);
   const [isExiting, setIsExiting] = useState(false);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      handleClose();
-    }, 3000);
-
-    return () => clearTimeout(timer);
-  }, []);
-
   const handleClose = () => {
     setIsExiting(true);
     onCloseStart?.();  // Trigger immediate callback
@@ -31,6 +23,17 @@ export function SyncNotification({ message, type, onClose, onCloseStart, action 
       onClose();
     }, 200);
   };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      handleClose();
+    }, 3000);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+
 
   if (!isVisible) return null;
 

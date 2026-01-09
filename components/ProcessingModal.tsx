@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { FileUp, FileSearch, FileSpreadsheet } from 'lucide-react';
 
 interface ProcessingModalProps {

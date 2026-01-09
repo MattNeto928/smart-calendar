@@ -37,7 +37,8 @@
     "components/StudentCalendar.tsx"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "smart-calendar-mobile"
   ],
   "extends": "expo/tsconfig.base"
 }

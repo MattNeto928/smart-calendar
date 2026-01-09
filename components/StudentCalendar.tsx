@@ -26,6 +26,9 @@ interface Event {
   courseTitle?: string;
   courseCode?: string;
   selected?: boolean;
+  canvasId?: string;
+  canvasUrl?: string;
+  canvasType?: string;
 }
 
 interface CalendarDay {
@@ -134,7 +137,7 @@ const StudentCalendar: React.FC = () => {
             } else {
               console.error(`File ${file.name} returned no valid events`);
             }
-          } catch (parserError: any) {
+          } catch (parserError: unknown) {
             // Specifically catch and handle the "length of undefined" error
             if (parserError instanceof TypeError && 
                 parserError.message && 
@@ -285,7 +288,7 @@ const StudentCalendar: React.FC = () => {
     }
   };
 
-  const getEventColor = (type: Event['type'], priority?: Event['priority']): string => {
+  const getEventColor = (type: Event['type'], priority?: Event['priority'], isCanvas?: boolean): string => {
     const baseColors = {
       test: 'bg-red-100 text-red-800 border-red-200',
       assignment: 'bg-blue-100 text-blue-800 border-blue-200',
@@ -299,7 +302,9 @@ const StudentCalendar: React.FC = () => {
       low: 'ring-2 ring-green-400'
     };
 
-    return `${baseColors[type]} ${priority ? priorityColors[priority] : ''}`;
+    const canvasStyle = isCanvas ? 'border-l-4 border-l-[#E41A2D]' : '';
+
+    return `${baseColors[type]} ${priority ? priorityColors[priority] : ''} ${canvasStyle}`;
   };
 
   const handleEditEvent = (event: Event) => {

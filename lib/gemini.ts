@@ -49,22 +49,23 @@ export class GeminiParser {
         model: "gemini-3-flash-preview", 
         safetySettings: [
           {
-            category: "HARM_CATEGORY_HARASSMENT",
-            threshold: "BLOCK_NONE"
+            category: "HARM_CATEGORY_HARASSMENT" as const,
+            threshold: "BLOCK_NONE" as const
           },
           {
-            category: "HARM_CATEGORY_HATE_SPEECH",
-            threshold: "BLOCK_NONE"
+            category: "HARM_CATEGORY_HATE_SPEECH" as const,
+            threshold: "BLOCK_NONE" as const
           },
           {
-            category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-            threshold: "BLOCK_NONE"
+            category: "HARM_CATEGORY_SEXUALLY_EXPLICIT" as const,
+            threshold: "BLOCK_NONE" as const
           },
           {
-            category: "HARM_CATEGORY_DANGEROUS_CONTENT",
-            threshold: "BLOCK_NONE"
+            category: "HARM_CATEGORY_DANGEROUS_CONTENT" as const,
+            threshold: "BLOCK_NONE" as const
           }
-        ]
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ] as any
       });
       console.log('Successfully initialized Gemini API with model gemini-1.5-flash-latest');
     } catch (error) {
@@ -424,7 +425,7 @@ Recurring event:
               }
               
               return text;
-            } catch (e: any) {
+            } catch (e: unknown) {
               // Specifically catch the "Cannot read property 'length' of undefined" error
               if (e instanceof TypeError && e.message && e.message.includes('length') && e.message.includes('undefined')) {
                 // Return a valid empty JSON response
@@ -481,10 +482,10 @@ Recurring event:
             }
             
             return event;
-          }).filter(Boolean);
+          }).filter(Boolean) as ExtractedEvent[];
           
           return processedEvents;
-        } catch (specificError: any) {
+        } catch (specificError: unknown) {
           console.error('Error in API or processing:', specificError);
           
           // If we get the specific TypeError, return empty array
