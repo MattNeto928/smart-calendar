@@ -11,6 +11,12 @@ interface ExtractedEvent {
   priority?: 'low' | 'medium' | 'high';
   courseTitle?: string;
   courseCode?: string;
+  isRecurring?: boolean;
+  recurrence?: {
+    frequency: 'weekly' | 'biweekly' | 'daily';
+    days: string[]; // e.g. ["Monday", "Wednesday"]
+    endDate?: string; // YYYY-MM-DD
+  };
 }
 
 interface GeminiEvent {
@@ -20,17 +26,16 @@ interface GeminiEvent {
   time?: string;
   location?: string;
   description?: string;
+  isRecurring?: boolean;
+  recurrence?: {
+    frequency: 'weekly' | 'biweekly' | 'daily';
+    days: string[];
+    endDate?: string;
+  };
 }
 
 
-interface GeminiEvent {
-  title: string;
-  date: string;
-  type: string;
-  time?: string;
-  location?: string;
-  description?: string;
-}
+
 
 
 export class GeminiParser {
@@ -116,8 +121,11 @@ export class GeminiParser {
 RULES:
 1. Extract the title, date, type, time, location, and description of each event
 2. For regular events with specific dates, use YYYY-MM-DD format (e.g., "2024-03-15")
-3. For recurring events (like weekly office hours) without specific dates, use the string "Recurring" as the date
-4. Event types must be one of: test, assignment, meeting, office_hours
+3. Event types must be one of: test, assignment, meeting, office_hours
+4. For recurring events (like weekly office hours):
+   - Set "isRecurring" to true
+   - Set "date" to the START date of the recurrence (or next occurrence)
+   - Include a "recurrence" object with frequency, days, and optionally endDate
 5. For missing fields, make educated guesses:
    - Priority: Based on event type (test=high, assignment=medium, meeting=medium, office_hours=low)
    - Time: Suggest typical times based on event type (e.g., tests in morning, office hours in afternoon)
@@ -133,22 +141,22 @@ RULES:
    - courseCode: string (null if not found)
 8. Return ONLY the valid JSON object, nothing else
 
-HANDLING RECURRING EVENTS:
-- For recurring events like office hours that happen on specific days of the week:
-  - Use "Recurring" as the date value
-  - Always include the day of week in either the title or description (e.g., "Tuesday Office Hours" or "Office hours held every Tuesday")
-  - Include the time and location if available
-
 RESPONSE FORMAT:
 {
   "events": [
     {
       "title": "string (required)",
-      "date": "YYYY-MM-DD or Recurring (required)",
+      "date": "YYYY-MM-DD (required - start date)",
       "type": "test|assignment|meeting|office_hours (required)",
       "time": "HH:MM AM/PM (optional)",
       "location": "string (optional)",
-      "description": "string (optional)"
+      "description": "string (optional)",
+      "isRecurring": boolean,
+      "recurrence": {
+        "frequency": "weekly|biweekly|daily",
+        "days": ["Monday", "Wednesday"],
+        "endDate": "YYYY-MM-DD (optional)"
+      }
     }
   ],
   "classLocation": "string or null",
@@ -160,33 +168,22 @@ If no valid events are found, return: { "events": [], "classLocation": null }
 
 EXAMPLE RESPONSES:
 
-Regular event:
-{
-  "events": [
-    {
-      "title": "Midterm Exam",
-      "date": "2024-03-15",
-      "type": "test",
-      "time": "10:00 AM",
-      "location": "Room 101",
-      "description": "Covers chapters 1-5"
-    }
-  ],
-  "classLocation": "Room 101",
-  "courseTitle": "Cloud Computing",
-  "courseCode": "CS 4400"
-}
-
 Recurring event:
 {
   "events": [
     {
       "title": "Tuesday Office Hours",
-      "date": "Recurring",
+      "date": "2024-01-16",
       "type": "office_hours",
       "time": "2:00 PM",
       "location": "Professor's Office, Room 305",
-      "description": "Weekly office hours every Tuesday, bring your questions"
+      "description": "Weekly office hours",
+      "isRecurring": true,
+      "recurrence": {
+        "frequency": "weekly",
+        "days": ["Tuesday"],
+        "endDate": "2024-05-01"
+      }
     }
   ],
   "classLocation": "Main Lecture Hall",
@@ -326,10 +323,15 @@ Recurring event:
               eventDate = today.toISOString().split('T')[0];
             }
             
-            // Convert the date to match the format used in the calendar component
+            // Prepend course code to title if available and not already present
+            let finalTitle = event.title;
+            if (courseCode && !finalTitle.includes(courseCode)) {
+              finalTitle = `${courseCode} - ${finalTitle}`;
+            }
+
             const processedEvent: ExtractedEvent = {
               id: Math.random().toString(36).substring(7),
-              title: event.title,
+              title: finalTitle,
               date: new Date(eventDate).toISOString().split('T')[0], // Use ISO format YYYY-MM-DD
               type: event.type as ExtractedEvent['type'],
               description: event.description,
@@ -337,7 +339,9 @@ Recurring event:
               time: event.time,
               priority: this.getDefaultPriority(event.type),
               courseTitle: courseTitle,
-              courseCode: courseCode
+              courseCode: courseCode,
+              isRecurring: event.isRecurring,
+              recurrence: event.recurrence
             };
             return processedEvent;
           } else {
@@ -355,7 +359,9 @@ Recurring event:
               time: event.time,
               priority: this.getDefaultPriority(event.type),
               courseTitle: courseTitle,
-              courseCode: courseCode
+              courseCode: courseCode,
+              isRecurring: event.isRecurring,
+              recurrence: event.recurrence
             };
             return processedEvent;
           }
@@ -453,32 +459,76 @@ Recurring event:
           // Process recurring events
           const processedEvents = events.map(event => {
             if (!event) return null;
+
+            // Check for description/title keywords implying recurrence
+            const description = event.description?.toLowerCase() || '';
+            const title = event.title?.toLowerCase() || '';
+            const recurrenceKeywords = [
+              'weekly', 'bi-weekly', 'biweekly', 'every', 'recurring', 'repeats', 'daily',
+              'mondays', 'tuesdays', 'wednesdays', 'thursdays', 'fridays', 'saturdays', 'sundays',
+              'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+              'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'
+            ];
+            const hasRecurrenceKeyword = recurrenceKeywords.some(kw => {
+              // unique check to avoid matching parts of words (like 'mon' in 'monitor')
+              const regex = new RegExp(`\\b${kw}\\b`, 'i');
+              return regex.test(description) || regex.test(title);
+            });
             
+            // Determine if recurring
+            const isRecurring = event.isRecurring || 
+                                event.date === "Recurring" || 
+                                (typeof event.date === 'string' && event.date.toLowerCase().includes('recurring')) ||
+                                hasRecurrenceKeyword;
+
             // Handle recurring events
-            if (event.date === "Recurring" || 
-               (typeof event.date === 'string' && event.date.toLowerCase().includes('recurring'))) {
+            if (isRecurring) {
+              // Ensure isRecurring is set to true on the object
+              event.isRecurring = true;
               
-              // Try to find day mentions
-              const dayMatches = this.findDayMentions(event.title, event.description);
-              const today = new Date();
-              let eventDate;
-              
-              if (dayMatches) {
-                const nextDateForDay = this.getNextOccurrenceOfDay(dayMatches.day, dayMatches.dayNumber);
-                eventDate = nextDateForDay.toISOString().split('T')[0];
-              } else {
-                // Use tomorrow as fallback
-                const tomorrow = new Date(today);
-                tomorrow.setDate(today.getDate() + 1);
-                eventDate = tomorrow.toISOString().split('T')[0];
+              // Try to find day mentions if not present
+              if (!event.recurrence || !event.recurrence.days || event.recurrence.days.length === 0) {
+                 const dayMatches = this.findDayMentions(event.title, event.description);
+                 if (dayMatches) {
+                    event.recurrence = {
+                        frequency: 'weekly',
+                        days: [dayMatches.day],
+                        endDate: event.recurrence?.endDate
+                    };
+                 }
               }
-              
-              return { ...event, date: eventDate };
+
+              // Logic to finding a start date if it's "Recurring"
+              if (event.date === "Recurring" || 
+                 (typeof event.date === 'string' && event.date.toLowerCase().includes('recurring'))) {
+                
+                // Try to find day mentions
+                const dayMatches = this.findDayMentions(event.title, event.description);
+                const today = new Date();
+                let eventDate;
+                
+                if (dayMatches) {
+                  const nextDateForDay = this.getNextOccurrenceOfDay(dayMatches.day, dayMatches.dayNumber);
+                  eventDate = nextDateForDay.toISOString().split('T')[0];
+                } else {
+                  // Use tomorrow as fallback
+                  const tomorrow = new Date(today);
+                  tomorrow.setDate(today.getDate() + 1);
+                  eventDate = tomorrow.toISOString().split('T')[0];
+                }
+                
+                return { ...event, date: eventDate };
+              }
             }
             
-            // Fix any invalid dates
-            if (!event.date || (typeof event.date === 'string' && isNaN(new Date(event.date).getTime()))) {
+            // Fix any invalid dates for non-recurring events
+            if (!event.isRecurring && (!event.date || (typeof event.date === 'string' && isNaN(new Date(event.date).getTime())))) {
               return { ...event, date: new Date().toISOString().split('T')[0] };
+            }
+            
+            // If it is recurring but has no start date, use today
+            if (event.isRecurring && (!event.date || event.date === 'Recurring')) {
+               return { ...event, date: new Date().toISOString().split('T')[0] };
             }
             
             return event;

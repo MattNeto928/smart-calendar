@@ -30,6 +30,87 @@ interface Event {
   canvasId?: string;
   canvasUrl?: string;
   canvasType?: string;
+  isRecurring?: boolean;
+  recurrence?: {
+    frequency: 'weekly' | 'biweekly' | 'daily';
+    days: string[];
+    endDate?: string;
+  };
+}
+
+// Helper to expand recurring events into individual instances
+function expandRecurringEvents(events: Event[]): Event[] {
+  const expandedEvents: Event[] = [];
+  const MAX_RECURRENCE_MONTHS = 4; // Generate for a semester by default (approx 4 months)
+
+  events.forEach(event => {
+    // If not recurring or missing recurrence data, keep as is
+    if (!event.isRecurring || !event.recurrence) {
+      expandedEvents.push(event);
+      return;
+    }
+
+    const { days, endDate } = event.recurrence;
+    
+    // Determine start and end dates
+    // Use local dates to avoid timezone issues
+    const startDateParts = event.date.split('-').map(Number);
+    const startDate = new Date(startDateParts[0], startDateParts[1] - 1, startDateParts[2]);
+    
+    let finalEndDate: Date;
+    if (endDate) {
+      const endParts = endDate.split('-').map(Number);
+      finalEndDate = new Date(endParts[0], endParts[1] - 1, endParts[2]);
+    } else {
+      // Default to 4 months from start if no end date provided
+      finalEndDate = new Date(startDate);
+      finalEndDate.setMonth(finalEndDate.getMonth() + MAX_RECURRENCE_MONTHS);
+    }
+
+    const currentProcessDate = new Date(startDate);
+    
+    // Safety break to prevent infinite loops
+    let count = 0;
+    const MAX_EVENTS_PER_RULE = 50; // Reasonable limit per recurring event rule
+
+    // Iterate day by day from start to end
+    while (currentProcessDate <= finalEndDate && count < MAX_EVENTS_PER_RULE) {
+       // Check if current day matches desired days
+       const dayName = currentProcessDate.toLocaleDateString('en-US', { weekday: 'long' });
+       const shortDayName = currentProcessDate.toLocaleDateString('en-US', { weekday: 'short' });
+       
+       const isMatch = days.some(d => 
+         d.toLowerCase() === dayName.toLowerCase() || 
+         d.toLowerCase() === shortDayName.toLowerCase()
+       );
+
+       if (isMatch) {
+         // Format date as YYYY-MM-DD
+         const year = currentProcessDate.getFullYear();
+         const month = String(currentProcessDate.getMonth() + 1).padStart(2, '0');
+         const day = String(currentProcessDate.getDate()).padStart(2, '0');
+         const dateString = `${year}-${month}-${day}`;
+
+         // Create event for this day
+         const newEvent: Event = {
+           ...event,
+           id: Math.random().toString(36).substring(7), // New unique ID
+           date: dateString,
+           // Remove recurrence flags so these look like normal events
+           isRecurring: false, 
+           recurrence: undefined,
+           selected: true
+         };
+         expandedEvents.push(newEvent);
+         count++;
+       }
+
+       // Advance date by 1 day
+       currentProcessDate.setDate(currentProcessDate.getDate() + 1);
+    }
+  });
+
+  return expandedEvents;
 }
 
 interface CalendarDay {
@@ -197,10 +278,14 @@ const StudentCalendar: React.FC = () => {
     try {
       setSyncState('syncing');
       
+      // Expand any recurring events into individual instances
+      const allEventsToSync = expandRecurringEvents(confirmedEvents);
+      console.log(`Expanded ${confirmedEvents.length} confirmed events into ${allEventsToSync.length} total events`);
+
       // Sync each event to the cloud
-      await Promise.all(confirmedEvents.map(event => syncEvent(event)));
+      await Promise.all(allEventsToSync.map(event => syncEvent(event)));
       
-      setEvents(prevEvents => [...prevEvents, ...confirmedEvents]);
+      setEvents(prevEvents => [...prevEvents, ...allEventsToSync]);
       setPendingEvents([]);
       
       setSyncState('synced');
